@@ -1,0 +1,4 @@
+.DS_Store
+./ssh-uuid
+./scp-uuid
+tests/test-config.sh
