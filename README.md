@@ -98,6 +98,7 @@ interpret it as stdout redirection.
 
 ## File transfer with `scp`
 
+Host OS:
 ```sh
 # local -> remote
 $ scp-uuid local.txt a123456abcdef123456abcdef1234567.balena:/mnt/data/
@@ -105,6 +106,17 @@ local.txt                   100%    6     0.0KB/s   00:00
 
 # remote -> local
 $ scp-uuid a123456abcdef123456abcdef1234567.balena:/tmp/remote.txt .
+remote.txt                  100%   17     0.0KB/s   00:01
+```
+
+Service container:
+```sh
+# local -> remote
+$ scp-uuid --service my-service local.txt a123456abcdef123456abcdef1234567.balena:
+local.txt                   100%    6     0.0KB/s   00:00
+
+# remote -> local
+$ scp-uuid --service my-service a123456abcdef123456abcdef1234567.balena:remote.txt .
 remote.txt                  100%   17     0.0KB/s   00:01
 ```
 
@@ -121,15 +133,21 @@ $ scp-uuid -r a123456abcdef123456abcdef1234567.balena:/mnt/data/remote-folder .
 remote.txt                  100%   17     0.0KB/s   00:01
 ```
 
-To copy files or folders to a service container, check the following sections for file
-copy with `cat`, `tar` or `rsync`. When the `--service` option is used with `scp-uuid`,
-help output is printed with some great or even superior alternatives using `tar` or
-`rsync`.
+In order to use the `--service` option, the `scp` client program (not a SSH server!) must
+be installed in the remote service container (as well as the local workstation), as
+follows:
 
-If you are transferring files to/from a service's named volume (often at the '/data' mount
-point in service containers), note that named volumes are also exposed on the host OS
-under folder `'/mnt/data/docker/volumes/<fleet-id>_data/_data/'`. As such, it is also
-possible to scp to/from named volumes without using `--service`:
+```sh
+$ apt-get install -y openssh-client  # Debian, Ubuntu, etc
+$ apk add openssh  # Alpine
+```
+
+If you would rather not install `scp` in the service container, check the following
+sections for file copy with `cat`, `tar` or `rsync`. Also, if you only need transfer files
+to/from a service's named volume (often at the '/data' mount point in service containers),
+it is possible to scp to/from named volumes without using `--service`, by directly
+targetting the host OS folder that holds named volumes such as
+`'/mnt/data/docker/volumes/<fleet-id>_data/_data/'`:
 
 ```sh
 # local -> remote
@@ -407,6 +425,15 @@ Reminder: public key authentication involves a pair of private and public keys:
   `DEBUG=1 ssh-uuid -v a123456abcdef123456abcdef1234567.balena cat /etc/issue`
 
 Common errors:
+
+* `scp: not found`  or  `scp: command not found`  
+  Typically indicates that the `scp` program (client) is not installed in the remote
+  service container. The `scp` program (client) must be installed both on the local
+  workstation and in remote service containers.
+  This can be easily done with `apt-get install -y openssh-client` on Ubuntu or Debian, or
+  `apk add openssh` on Alpine. Note: A SSH **server** does **NOT** need to be installed in
+  either the local workstation or remote service containers. The only SSH **server**
+  involved is the one that runs by default on balenaOS (host OS).
 
 * `socat[1355] E parseopts(): unknown option "proxy-authorization-file"`  
   This error means that your system is using an outdate version of 'socat'.
