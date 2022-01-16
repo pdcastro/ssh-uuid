@@ -159,10 +159,16 @@ function parse_short_flag {
 	done
 }
 
-function split_ssh_positional_args {
+# Parse the arguments and split them between option arguments and positional
+# arguments.
+# Note: the split happens at the first UUID.balena occurrence which is always
+# correct for `ssh`, but not always correct for `scp`. For the purposes of
+# `scp-uuid` however, this potential incorrectness is not important.
+function parse_args {
 	local args=("$@")
 	local nargs=${#args[@]}
 	local i
+	SSUU_USER=''
 	SSUU_OPT_ARGS=()
 	SSUU_POS_ARGS=()
 	for (( i=0; i<nargs; i++ )); do
@@ -175,13 +181,40 @@ function split_ssh_positional_args {
 			continue
 		fi
 		# Is arg a UUID.balena hostname specification?
-		#   '[user@]hostname'
-		#   'ssh://[user@]hostname[:port]'
-		# where hostname has format "UUID.balena",
+		# For ssh:
+		#   '[user@]UUID.balena'
+		#   'ssh://[user@]UUID.balena[:port]'
+		# For scp:
+		#   '[user@]UUID.balena:'
+		#   'scp://[user@]UUID.balena[:port][/path]'
 		# where UUID is a hexadecimal number with exactly 32 or 62 characters,
 		# where 62 is not typo meant to read 64, it really is 62.
-		if [[ "${arg}" =~ ^(ssh://)?((.+)@)?([[:xdigit:]]{32}|[[:xdigit:]]{62})\.balena(:.+)?$ ]]; then
+		if [[ "${SSUU_SCP}" = 0 &&
+				"${arg}" =~ ^(ssh://)?((.+)@)?([[:xdigit:]]{32}|[[:xdigit:]]{62})\.balena(:[0-9]+)?$
+			]]; then
 			SSUU_USER="${BASH_REMATCH[3]}"
+			SSUU_POS_ARGS=("${args[@]:i}")
+			break
+		elif [[ "${SSUU_SCP}" = 1 &&
+			"${arg}" =~ ^scp://((.+)@)?([[:xdigit:]]{32}|[[:xdigit:]]{62})\.balena(:[0-9]+)?(/.*)?$
+			]]; then
+			SSUU_USER="${BASH_REMATCH[2]}"
+			if [ -z "${SSUU_USER}" ] && [ -n "${BALENA_USERNAME}" ]; then
+				SSUU_USER="${BALENA_USERNAME}"
+				arg="scp://${BALENA_USERNAME}@${arg#scp://}"
+				args[i]="${arg}"
+			fi
+			SSUU_POS_ARGS=("${args[@]:i}")
+			break
+		elif [[ "${SSUU_SCP}" = 1 &&
+			"${arg}" =~ ^((.+)@)?([[:xdigit:]]{32}|[[:xdigit:]]{62})\.balena:.*$
+			]]; then
+			SSUU_USER="${BASH_REMATCH[2]}"
+			if [ -z "${SSUU_USER}" ] && [ -n "${BALENA_USERNAME}" ]; then
+				SSUU_USER="${BALENA_USERNAME}"
+				arg="${BALENA_USERNAME}@${arg}"
+				args[i]="${arg}"
+			fi
 			SSUU_POS_ARGS=("${args[@]:i}")
 			break
 		fi
@@ -191,12 +224,15 @@ function split_ssh_positional_args {
 		SSUU_OPT_ARGS+=("${arg}")
 	done
 	if [ "${#SSUU_POS_ARGS[@]}" = 0 ]; then
-		quit "Invalid command line (missing 'UUID.balena' hostname)"
+		if [ "${SSUU_SCP}" = '1' ]; then
+			quit "Invalid command line (missing 'UUID.balena:' remote host, including ':' character)"
+		else
+			quit "Invalid command line (missing 'UUID.balena' hostname)"
+		fi
 	fi
 }
 
 function run_ssh {
-	split_ssh_positional_args "$@"
 	local opt_args=("${SSUU_OPT_ARGS[@]}")  # optional arguments
 	local pos_args=("${SSUU_POS_ARGS[@]}")  # positional arguments
 	local l_arg=()
@@ -286,49 +322,27 @@ $ scp-uuid -r local-folder ${uuid}.balena:/mnt/data/docker/volumes/<fleet-id>_da
 
 # remote -> local
 $ scp-uuid -r ${uuid}.balena:/mnt/data/docker/volumes/<fleet-id>_data/_data/remote-folder .
-"
+" >/dev/stderr
 }
 
 function run_scp {
-	local args=("$@")
-	local nargs=${#args[@]}
-	local found_hostname='0'
-	local user=''
-	local i
-	for (( i=0; i<nargs; i++ )); do
-		local arg="${args[i]}"
-		if [ "${arg}" = '--help' ]; then
-			print_help_and_quit
+	if [ -n "${SSUU_SERVICE}" ]; then
+		if [ -n "${SSUU_FLAG_S}" ]; then
+			quit "The '-S' and '--service' options cannot be used together"
 		fi
-		if [ "${arg}" = '--service' ]; then
-			local service="${args[i+1]:-foo}"
-			quit "$(print_scp_service_msg "${service}" "UUID")"
-		fi
-		# Is arg a UUID.balena hostname specification?
-		#   '[[user@]host:]file1'
-		#   'scp://[user@]host[:port][/path]'
-		# where host has format "UUID.balena",
-		# where UUID is a hexadecimal number with exactly 32 or 62 characters,
-		# where 62 is not typo meant to read 64, it really is 62.
-		if [[ "${arg}" =~ ^(scp://)?((.+)@)?([[:xdigit:]]{32}|[[:xdigit:]]{62})\.balena(:.+)?$ ]]; then
-			user="${BASH_REMATCH[3]}"
-			found_hostname='1'
-			break
-		fi
-	done
-	if [ "${found_hostname}" != '1' ]; then
-		quit "Invalid command line (missing 'UUID.balena' hostname)"
-	fi
-	if [ -n "${user}" ]; then
-		local user_opt=()
-	else
-		local user_opt=(-o "User=${BALENA_USERNAME}")
+		export SSUU_SERVICE
+		set +e
+		[ -n "${DEBUG}" ] && set -x
+		scp -S ssh-uuid "${SSUU_OPT_ARGS[@]}" "${SSUU_POS_ARGS[@]}"
+		{ local status="$?"; [ -n "${DEBUG}" ] && set +x; } 2>/dev/null
+		set -e
+		return "${status}"
 	fi
 	args=(
 		-P 22222
 		-o "ProxyCommand='$0' do_proxy %h %p"
-		"${user_opt[@]}"
-		"${args[@]}"
+		"${SSUU_OPT_ARGS[@]}"
+		"${SSUU_POS_ARGS[@]}"
 	)
 	set +e
 	[ -n "${DEBUG}" ] && set -x
@@ -387,11 +401,16 @@ function main {
 		shift
 		do_proxy "$@"
 	else
-		case "$(basename "$0")" in
-			'ssh-uuid.sh') run_ssh "$@";;
-			'ssh-uuid') run_ssh "$@";;
-			'scp-uuid') run_scp "$@";;
-		esac
+		SSUU_SCP='0'
+		if [ "$(basename "$0")" = 'scp-uuid' ]; then
+			SSUU_SCP='1'
+		fi
+		parse_args "$@"
+		if [ "${SSUU_SCP}" = '1' ]; then
+			run_scp "$@"
+		else
+			run_ssh "$@"
+		fi
 	fi
 }
 

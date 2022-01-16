@@ -214,8 +214,7 @@ function test_service_cat_with_spaces {
 	local cmd1=("${SSH_WITH_SERVICE[@]}" echo "${contents}" '>' "${fname}")
 	local expected1=''
 	local cmd2=("${SSH_WITH_SERVICE[@]}" cat "${fname}")
-	local expected2
-	expected2="${contents}"
+	local expected2="${contents}"
 	local expected_status='0'
 
 	run_test "${FUNCNAME[0]} (1)" "$(escape_a "${cmd1[@]}")" "${expected1}" "${expected_status}"
@@ -265,8 +264,7 @@ function test_scp_local_to_remote {
 	local cmd1=("${SCP_UUID}" "${fname}" "${TEST_DEVICE_HOST}:${escaped_fname}")
 	local expected1=''
 	local cmd2=("${SSH_WITH_IP_ADDRESS[@]}" cat "${escaped_fname}")
-	local expected2
-	expected2="${contents}"
+	local expected2="${contents}"
 	local expected_status='0'
 
 	run_test "${FUNCNAME[0]} (1)" "$(escape_a "${cmd1[@]}")" "${expected1}" "${expected_status}"
@@ -290,7 +288,7 @@ function test_scp_remote_to_local {
 	local cmd1=("${SCP_UUID}" "${TEST_DEVICE_HOST}:${escaped_fname}" "${fname}")
 	local expected1=''
 	local cmd2=(cat "${fname}")
-	expected2="${contents}"
+	local expected2="${contents}"
 	local expected_status='0'
 
 	run_test "${FUNCNAME[0]} (1)" "$(escape_a "${cmd1[@]}")" "${expected1}" "${expected_status}"
@@ -298,6 +296,56 @@ function test_scp_remote_to_local {
 
 	# clean up
 	rm -f "${fname}"
+}
+
+function test_scp_service_local_to_remote {
+	local contents="hi there
+(local)"
+	local fname='/tmp/local copy.txt'
+	local escaped_fname
+	printf -v escaped_fname '%q' "${fname}"
+
+	# clean up previous runs and create local file
+	"${SSH_WITH_SERVICE[@]}" rm -f "${escaped_fname}"
+	echo "${contents}" > "${fname}"
+
+	local cmd1=("${SCP_UUID}" --service "${TEST_SERVICE}" "${fname}" "${TEST_DEVICE_HOST}:${escaped_fname}")
+	local expected1=''
+	local cmd2=("${SSH_WITH_SERVICE[@]}" cat "${escaped_fname}")
+	local expected2="${contents}"
+	local expected_status='0'
+
+	run_test "${FUNCNAME[0]} (1)" "$(escape_a "${cmd1[@]}")" "${expected1}" "${expected_status}"
+	run_test "${FUNCNAME[0]} (2)" "$(escape_a "${cmd2[@]}")" "${expected2}" "${expected_status}"
+
+	# clean up
+	rm -f "${fname}"
+	"${SSH_WITH_SERVICE[@]}" rm -f "${escaped_fname}"
+}
+
+function test_scp_service_remote_to_local {
+	local contents="hi there
+(remote)"
+	local fname='/tmp/remote copy.txt'
+	local escaped_fname
+	printf -v escaped_fname '%q' "${fname}"
+
+	# clean up previous runs and create remote file
+	rm -f "${fname}"
+	"${SSH_WITH_SERVICE[@]}" echo "'${contents}'" '>' "${escaped_fname}"
+
+	local cmd1=("${SCP_UUID}" --service "${TEST_SERVICE}" "${TEST_DEVICE_HOST}:${escaped_fname}" "${fname}")
+	local expected1=''
+	local cmd2=(cat "${fname}")
+	local expected2="${contents}"
+	local expected_status='0'
+
+	run_test "${FUNCNAME[0]} (1)" "$(escape_a "${cmd1[@]}")" "${expected1}" "${expected_status}"
+	run_test "${FUNCNAME[0]} (2)" "$(escape_a "${cmd2[@]}")" "${expected2}" "${expected_status}"
+
+	# clean up
+	rm -f "${fname}"
+	"${SSH_WITH_SERVICE[@]}" rm -f "${escaped_fname}"
 }
 
 function test_rsync_local_to_remote {
@@ -315,8 +363,7 @@ function test_rsync_local_to_remote {
 	local cmd1=('rsync' '-e' "ssh-uuid --service ${TEST_SERVICE}" "${fname}" "${TEST_DEVICE_HOST}:${escaped_fname}")
 	local expected1=''
 	local cmd2=("${SSH_WITH_SERVICE[@]}" cat "${escaped_fname}")
-	local expected2
-	expected2="${contents}"
+	local expected2="${contents}"
 	local expected_status='0'
 
 	run_test "${FUNCNAME[0]} (1)" "$(escape_a "${cmd1[@]}")" "${expected1}" "${expected_status}"
@@ -342,8 +389,7 @@ function test_rsync_remote_to_local {
 	local cmd1=('rsync' '-e' "ssh-uuid --service ${TEST_SERVICE}" "${TEST_DEVICE_HOST}:${escaped_fname}" "${fname}")
 	local expected1=''
 	local cmd2=(cat "${fname}")
-	local expected2
-	expected2="${contents}"
+	local expected2="${contents}"
 	local expected_status='0'
 
 	run_test "${FUNCNAME[0]} (1)" "$(escape_a "${cmd1[@]}")" "${expected1}" "${expected_status}"
@@ -355,7 +401,7 @@ function test_rsync_remote_to_local {
 }
 
 function test_counter {
-	local expected_count=35
+	local expected_count=39
 	if [ "${TEST_COUNTER}" != "${expected_count}" ]; then
 		quit "\nTEST COUNT FAILED: expected '${expected_count}' tests to run, counted '${TEST_COUNTER}'"
 	fi
@@ -378,6 +424,9 @@ function run_tests {
 
 	test_scp_local_to_remote
 	test_scp_remote_to_local
+
+	test_scp_service_local_to_remote
+	test_scp_service_remote_to_local
 
 	test_rsync_local_to_remote
 	test_rsync_remote_to_local
