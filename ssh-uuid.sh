@@ -23,7 +23,8 @@ function quit {
 	exit 1
 }
 
-# check bash version
+# Check that the version of bash meets the requirements.
+# The 'declare -pf' and 'readarray -t' features require bash v4.4 or later.
 function check_bash_version {
 	local major="${BASH_VERSINFO[0]:-0}"
 	local minor="${BASH_VERSINFO[1]:-0}"
@@ -100,7 +101,7 @@ function remote__get_container_name {
 	local service="$1"
 	local len="${#service}"
 	local -a names
-	read -ra names <<< "$(balena-engine ps --format '{{.Names}}')"
+	readarray -t names <<< "$(balena-engine ps --format '{{.Names}}')"
 	local result=''
 	local name
 	for name in "${names[@]}"; do
