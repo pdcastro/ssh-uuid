@@ -10,7 +10,7 @@ Table of Contents
   - [File transfer with `cat`](#file-transfer-with-cat)
   - [File transfer with `tar`](#file-transfer-with-tar)
   - [File transfer with `rsync`](#file-transfer-with-rsync)
-  - [Port fowarding and SOCKS proxy with ssh's `-D`, `-L` and `-R` options](#port-fowarding-and-socks-proxy-with-sshs--d--l-and--r-options)
+  - [Port forwarding and SOCKS proxy with ssh's `-D`, `-L` and `-R` options](#port-forwarding-and-socks-proxy-with-sshs--d--l-and--r-options)
     - [Web (http) server running on the device: local port 8000, remote port 80](#web-http-server-running-on-the-device-local-port-8000-remote-port-80)
     - [Local port 80 may be forwarded using `sudo`](#local-port-80-may-be-forwarded-using-sudo)
     - ["Hostvia" - Access a remote device through another remote device](#hostvia---access-a-remote-device-through-another-remote-device)
@@ -146,7 +146,7 @@ If you would rather not install `scp` in the service container, check the follow
 sections for file copy with `cat`, `tar` or `rsync`. Also, if you only need transfer files
 to/from a service's named volume (often at the '/data' mount point in service containers),
 it is possible to scp to/from named volumes without using `--service`, by directly
-targetting the host OS folder that holds named volumes such as
+targeting the host OS folder that holds named volumes such as
 `'/mnt/data/docker/volumes/<fleet-id>_data/_data/'`:
 
 ```sh
@@ -202,7 +202,7 @@ $ apt-get install -y rsync  # Debian, Ubuntu, etc
 $ apk add rsync  # Alpine
 ```
 
-## Port fowarding and SOCKS proxy with ssh's `-D`, `-L` and `-R` options
+## Port forwarding and SOCKS proxy with ssh's `-D`, `-L` and `-R` options
 
 The wrapper does not interfere, and the full power of standard ssh is made available. This
 is a full replacement for the `balena tunnel` command, with additional capabilities such a
@@ -323,7 +323,7 @@ brew update && brew install bash git jq socat ssh
 
 ### Linux (Debian, Ubuntu, others)
 
-At the time of this writing, the latest stable distros of Debian and Ubuntu provide an
+At the time of this writing, the latest stable distributions of Debian and Ubuntu provide an
 outdated version of `socat` with `apt-get install` (they provide socat v1.7.3, but we need
 socat v1.7.4 or later). Here's how to install `socat` v1.7.4 (tested with Debian 9, Debian
 10 and Ubuntu 20.04):
@@ -346,7 +346,7 @@ http://www.dest-unreach.org/socat/doc/README
 
 ### Windows
 
-Native PowerShell or cmd.exe are not supported by this proof-of-concept implemntation,
+Native PowerShell or cmd.exe are not supported by this proof-of-concept implementation,
 but you can use Microsoft's [WSL - Windows Subsystem for
 Linux](https://docs.microsoft.com/en-us/windows/wsl/install) (e.g. Ubuntu), and then
 follow the instructions for Linux.
@@ -367,8 +367,8 @@ authentication is to log in with the balena CLI by running the following command
 
 Running ***both*** commands will ensure that file `~/.balena/cachedUsername` exists and
 contains a valid (not expired) session token. The file stores both a balenaCloud username
-is the respective session token. The `ssh-uuid` or `scp-uuid` commands will check whether
-that file exists (optional), to use the details in there for convenience.
+and a session token. The `ssh-uuid` or `scp-uuid` commands will check whether that file
+exists (optional), to use the details in there for convenience.
 
 > Note: The `ssh-uuid` or `scp-uuid` script does not check whether a session token has
 > expired. Expired tokens will cause authentication errors. If the `'balena whoami'`
@@ -415,7 +415,7 @@ Reminder: public key authentication involves a pair of private and public keys:
   is executed.
 * A copy of the public key is additionally stored remotely, either on the machine where
   the ssh server is running (e.g. the `config.json` file of a balenaOS device), or in the
-  cloud (balenaCloud dashboard / API datatabase).
+  cloud (balenaCloud dashboard / API database).
 
 # Troubleshooting
 
@@ -489,7 +489,7 @@ connections to the ssh server on devices.
 The `balena tunnel` command was created in part to work around these limitations, by
 tunneling a TCP connection (raw bytestream) between a standard `ssh` client and the `ssh`
 server on a balenaOS device. However, to that end, `balena tunnel` adds complexity and a
-point of failure by requiring users to explicity run two different processes in different
+point of failure by requiring users to explicitly run two different processes in different
 shell prompts: `balena tunnel` in a prompt, and standard `ssh` in another. It also falls
 on the user to choose a free TCP port number to provide as argument to both processes.
 Also, `balena tunnel` offers only a small subset of features/options of standard `ssh`,
