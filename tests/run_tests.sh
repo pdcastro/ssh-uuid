@@ -349,7 +349,6 @@ function test_scp_service_remote_to_local {
 }
 
 function test_rsync_local_to_remote {
-	set -x
 	local contents="hi there
 (local, rsync)"
 	local fname='/tmp/local copy (rsync).txt'
@@ -375,7 +374,6 @@ function test_rsync_local_to_remote {
 }
 
 function test_rsync_remote_to_local {
-	set -x
 	local contents="hi there
 (remote, rsync)"
 	local fname='/tmp/remote copy (rsync).txt'
