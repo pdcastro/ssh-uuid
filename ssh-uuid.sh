@@ -389,10 +389,8 @@ function get_rand_port_num {
 }
 
 function check_tool {
-	local tool
-	tool=$(which "$1")
-	if [[ ! -x "${tool}" ]]; then
-		quit "Unable to execute '${tool}'. Is it installed?"
+	if [ ! $(which "$1") ]; then
+		quit "'$1' not found in PATH. Is it installed?"
 	fi
 }
 
