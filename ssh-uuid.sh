@@ -389,9 +389,7 @@ function get_rand_port_num {
 }
 
 function check_tool {
-	if [ ! $(which "$1") ]; then
-		quit "'$1' not found in PATH. Is it installed?"
-	fi
+	which "$1" &>/dev/null || quit "'$1' not found in PATH. Is it installed?"
 }
 
 function main {
