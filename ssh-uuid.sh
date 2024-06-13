@@ -169,6 +169,7 @@ function parse_args {
 	local args=("$@")
 	local nargs=${#args[@]}
 	local i
+	SSUU_PROXY=1
 	SSUU_USER=''
 	SSUU_OPT_ARGS=()
 	SSUU_POS_ARGS=()
@@ -184,20 +185,28 @@ function parse_args {
 		# Is arg a UUID.balena hostname specification?
 		# For ssh:
 		#   '[user@]UUID.balena'
+		#   '[user@]UUID.local'
 		#   'ssh://[user@]UUID.balena[:port]'
+		#   'ssh://[user@]UUID.local[:port]'
 		# For scp:
 		#   '[user@]UUID.balena:'
+		#   '[user@]UUID.local:'
 		#   'scp://[user@]UUID.balena[:port][/path]'
+		#   'scp://[user@]UUID.local[:port][/path]'
 		# where UUID is a hexadecimal number with exactly 32 or 62 characters,
-		# where 62 is not typo meant to read 64, it really is 62.
+		# where 62 is not typo meant to read 64, it really is 62. 7-character
+		# abbreviated UUIDs are also accepted for local-mode devices.
 		if [[ "${SSUU_SCP}" = 0 &&
-				"${arg}" =~ ^(ssh://)?((.+)@)?([[:xdigit:]]{32}|[[:xdigit:]]{62})\.balena(:[0-9]+)?$
+				"${arg}" =~ ^(ssh://)?((.+)@)?([[:xdigit:]]{7}|[[:xdigit:]]{32}|[[:xdigit:]]{62})\.(balena|local)(:[0-9]+)?$
 			]]; then
 			SSUU_USER="${BASH_REMATCH[3]}"
 			SSUU_POS_ARGS=("${args[@]:i}")
+			if [[ "${BASH_REMATCH[5]}" == "local" ]]; then
+				SSUU_PROXY=0
+			fi
 			break
 		elif [[ "${SSUU_SCP}" = 1 &&
-			"${arg}" =~ ^scp://((.+)@)?([[:xdigit:]]{32}|[[:xdigit:]]{62})\.balena(:[0-9]+)?(/.*)?$
+			"${arg}" =~ ^scp://((.+)@)?([[:xdigit:]]{7}|[[:xdigit:]]{32}|[[:xdigit:]]{62})\.(balena|local)(:[0-9]+)?(/.*)?$
 			]]; then
 			SSUU_USER="${BASH_REMATCH[2]}"
 			if [ -z "${SSUU_USER}" ] && [ -n "${BALENA_USERNAME}" ]; then
@@ -206,9 +215,12 @@ function parse_args {
 				args[i]="${arg}"
 			fi
 			SSUU_POS_ARGS=("${args[@]:i}")
+			if [[ "${BASH_REMATCH[4]}" == "local" ]]; then
+				SSUU_PROXY=0
+			fi
 			break
 		elif [[ "${SSUU_SCP}" = 1 &&
-			"${arg}" =~ ^((.+)@)?([[:xdigit:]]{32}|[[:xdigit:]]{62})\.balena:.*$
+			"${arg}" =~ ^((.+)@)?([[:xdigit:]]{7}|[[:xdigit:]]{32}|[[:xdigit:]]{62})\.(balena|local):.*$
 			]]; then
 			SSUU_USER="${BASH_REMATCH[2]}"
 			if [ -z "${SSUU_USER}" ] && [ -n "${BALENA_USERNAME}" ]; then
@@ -217,6 +229,9 @@ function parse_args {
 				args[i]="${arg}"
 			fi
 			SSUU_POS_ARGS=("${args[@]:i}")
+			if [[ "${BASH_REMATCH[4]}" == "local" ]]; then
+				SSUU_PROXY=0
+			fi
 			break
 		fi
 		if [ "${arg:0:1}" = '-' ] && [ "${arg:1:1}" != '-' ]; then
@@ -264,12 +279,17 @@ function run_ssh {
 		l_arg=('-l' "${BALENA_USERNAME}")
 	fi
 	opt_args=(
-		-o "ProxyCommand='$0' do_proxy %h %p"
 		-p 22222
 		"${l_arg[@]}"
 		"${t_arg[@]}"
 		"${opt_args[@]}"
 	)
+	if [[ "${SSUU_PROXY}" == 1 ]]; then
+		opt_args=(
+			-o "ProxyCommand='$0' do_proxy %h %p"
+			"${opt_args[@]}"
+		)
+	fi
 	set +e
 	[ -n "${DEBUG}" ] && set -x
 	# shellcheck disable=SC2029
@@ -341,10 +361,15 @@ function run_scp {
 	fi
 	args=(
 		-P 22222
-		-o "ProxyCommand='$0' do_proxy %h %p"
 		"${SSUU_OPT_ARGS[@]}"
 		"${SSUU_POS_ARGS[@]}"
 	)
+	if [[ "${SSUU_PROXY}" == 1 ]]; then
+		args=(
+			-o "ProxyCommand='$0' do_proxy %h %p"
+			"${args[@]}"
+		)
+	fi
 	set +e
 	[ -n "${DEBUG}" ] && set -x
 	scp "${args[@]}"
