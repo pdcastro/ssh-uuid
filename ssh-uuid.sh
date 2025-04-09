@@ -367,8 +367,11 @@ function do_proxy {
 	{ set +x; } 2>/dev/null
 	sleep 1 # poor man's wait for the background socat process to be ready
 	[ -n "${DEBUG}" ] && set -x
+	set +e
 	socat - "PROXY:127.0.0.1:${TARGET_HOST}:${TARGET_PORT},proxyport=${SOCAT_PORT},proxy-authorization-file=${PROXY_AUTH_FILE}"
 	{ local status="$?"; [ -n "${DEBUG}" ] && set +x; } 2>/dev/null
+	set -e
+	kill $(jobs -p) && wait # shutdown background tunnel
 	return "${status}"
 }
 
