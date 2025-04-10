@@ -447,6 +447,25 @@ Common errors:
   Double check that the UUID is correct. Ensure you're using the full long UUID, not the
   7-char short form.
 
+* `subsystem request failed on channel 0`  
+  This is likely to indicate an incompatibility between the versions of the `scp` client
+  installed on the workstation and on the remote device (service container or host OS, as
+  applicable). Newer versions of `scp` use the “SFTP protocol” for file transfers, while
+  older versions use the “legacy SCP protocol”. If the `scp` client on the local
+  workstation is the newer version, you can use the `scp -O` or `scp-uuid -O` flag (that’s
+  the big letter oh, not the number zero) to tell `scp` to use the legacy protocol.
+
+* `scp: ambiguous target`  
+  This is likely to indicate that the name of the file being transferred contains unquoted
+  blank spaces. Quote them with backslashes or additional quotes. For example:  
+  `scp-uuid 'my file.txt' a123456abcdef123456abcdef1234567.balena:"'my file.txt'"`  
+  Dishearteningly, quoting also appears to depend on whether `scp` uses the newer SFTP
+  transfer protocol or the legacy SCP transfer protocol (check `scp`’s documentation
+  of the `-O` flag). When it uses the newer SFTP transfer protocol, the command line
+  above would be written with fewer quotes:  
+  `scp-uuid 'my file.txt' a123456abcdef123456abcdef1234567.balena:'my file.txt'`
+
+
 # Why?
 
 Why are `ssh-uuid` and `scp-uuid` needed? What's wrong with the existing `balena ssh` and
