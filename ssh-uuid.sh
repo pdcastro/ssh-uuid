@@ -366,12 +366,14 @@ function do_proxy {
 	socat "TCP-LISTEN:${SOCAT_PORT},bind=127.0.0.1" "OPENSSL:tunnel.balena-cloud.com:443,snihost=tunnel.balena-cloud.com" &
 	{ set +x; } 2>/dev/null
 	sleep 1 # poor man's wait for the background socat process to be ready
-	[ -n "${DEBUG}" ] && set -x
 	set +e
+	[ -n "${DEBUG}" ] && set -x
 	socat - "PROXY:127.0.0.1:${TARGET_HOST}:${TARGET_PORT},proxyport=${SOCAT_PORT},proxy-authorization-file=${PROXY_AUTH_FILE}"
 	{ local status="$?"; [ -n "${DEBUG}" ] && set +x; } 2>/dev/null
 	set -e
-	kill $(jobs -p) && wait # shutdown background tunnel
+	local pid
+	pid="$(jobs -p)"
+	[ -n "${pid}" ] && kill "${pid}" && wait # shutdown background tunnel
 	return "${status}"
 }
 
