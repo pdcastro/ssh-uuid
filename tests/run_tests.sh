@@ -38,7 +38,7 @@ TEST_SERVICE="${TEST_SERVICE:-my-service}"
 TEST_SERVICE_ISSUE="${TEST_SERVICE_ISSUE:-Debian GNU/Linux 11 \n \l}"
 # END - test configuration variables
 
-SCP_UUID="${TEST_DIR}/scp-uuid"
+SCP_UUID=("${TEST_DIR}/scp-uuid" -O)
 SSH_UUID="${TEST_DIR}/ssh-uuid"
 
 SSH_WITH_IP_ADDRESS=(ssh -p 22222 "root@${TEST_DEVICE_IP}")
@@ -60,6 +60,16 @@ function escape_a {
 	printf '%q ' "$@"
 }
 
+# Print the arguments with bash escaping (printf %q), in the same format
+# of bash's `set -x`. Useful when `set -x` would print unwanted output.
+function print_cmd {
+	printf +
+	for word in "$@"; do
+		printf ' %q' "${word}"
+	done
+	printf %b '\n'
+}
+
 function run_test {
 	local test_name="$1"
 	local -a cmd="($2)" # unescaped array
@@ -68,12 +78,11 @@ function run_test {
 	local actual
 	local actual_status
 
-	set -x
+	print_cmd "${cmd[@]}"
 	actual="$("${cmd[@]}" 2>&1)"
-	{ actual_status="$?"; set +x; } 2>/dev/null
-
-	# echo "actual: ~${actual}~ (${actual_status})"
-	# echo "expected: ~${expected}~ (${expected_status})"
+	actual_status="$?"
+	# Filter out known harmless socat warning messages
+	actual="$(echo "${actual}" | grep --invert-match 'OpenSSL: Warning: this implementation does not check CRLs')"
 
 	if [ "${actual}" != "${expected}" ]; then
 		quit "\nTEST '${test_name}': FAIL\n
@@ -136,6 +145,9 @@ function test_host_os_cat_with_spaces {
 
 	run_test "${FUNCNAME[0]} (IP address 2)" "$(escape_a "${cmd1[@]}")" "${expected1}" "${expected_status}"
 	run_test "${FUNCNAME[0]} (UUID 2)" "$(escape_a "${cmd2[@]}")" "${expected2}" "${expected_status}"
+
+	# clean up
+	"${SSH_WITH_IP_ADDRESS[@]}" rm -f "${fname}"
 }
 
 function test_host_os_cat_with_encoded_line_breaks {
@@ -160,6 +172,9 @@ function test_host_os_cat_with_encoded_line_breaks {
 
 	run_test "${FUNCNAME[0]} (UUID 2)" "$(escape_a "${cmd1[@]}")" "${expected1}" "${expected_status}"
 	run_test "${FUNCNAME[0]} (IP address 2)" "$(escape_a "${cmd2[@]}")" "${expected2}" "${expected_status}"
+
+	# clean up
+	"${SSH_WITH_IP_ADDRESS[@]}" rm -f "${fname}"
 }
 
 function test_host_os_cat_with_unencoded_line_breaks {
@@ -186,6 +201,9 @@ line2 (with unencoded newline characters)
 
 	run_test "${FUNCNAME[0]} (UUID 2)" "$(escape_a "${cmd1[@]}")" "${expected1}" "${expected_status}"
 	run_test "${FUNCNAME[0]} (IP address 2)" "$(escape_a "${cmd2[@]}")" "${expected2}" "${expected_status}"
+
+	# clean up
+	"${SSH_WITH_IP_ADDRESS[@]}" rm -f "${fname}"
 }
 
 function test_service_status {
@@ -257,11 +275,11 @@ function test_scp_local_to_remote {
 	local escaped_fname
 	printf -v escaped_fname '%q' "${fname}"
 
-	# clean up previous runs and create local file
+	# clean up any previous failed runs and create local file
 	"${SSH_WITH_IP_ADDRESS[@]}" rm -f "${escaped_fname}"
 	echo "${contents}" > "${fname}"
 
-	local cmd1=("${SCP_UUID}" "${fname}" "${TEST_DEVICE_HOST}:${escaped_fname}")
+	local cmd1=("${SCP_UUID[@]}" "${fname}" "${TEST_DEVICE_HOST}:${escaped_fname}")
 	local expected1=''
 	local cmd2=("${SSH_WITH_IP_ADDRESS[@]}" cat "${escaped_fname}")
 	local expected2="${contents}"
@@ -272,6 +290,7 @@ function test_scp_local_to_remote {
 
 	# clean up
 	rm -f "${fname}"
+	"${SSH_WITH_IP_ADDRESS[@]}" rm -f "${escaped_fname}"
 }
 
 function test_scp_remote_to_local {
@@ -281,11 +300,11 @@ function test_scp_remote_to_local {
 	local escaped_fname
 	printf -v escaped_fname '%q' "${fname}"
 
-	# clean up previous runs and create remote file
+	# clean up any previous failed runs and create remote file
 	rm -f "${fname}"
 	"${SSH_WITH_IP_ADDRESS[@]}" echo "'${contents}'" '>' "${escaped_fname}"
 
-	local cmd1=("${SCP_UUID}" "${TEST_DEVICE_HOST}:${escaped_fname}" "${fname}")
+	local cmd1=("${SCP_UUID[@]}" "${TEST_DEVICE_HOST}:${escaped_fname}" "${fname}")
 	local expected1=''
 	local cmd2=(cat "${fname}")
 	local expected2="${contents}"
@@ -296,6 +315,7 @@ function test_scp_remote_to_local {
 
 	# clean up
 	rm -f "${fname}"
+	"${SSH_WITH_IP_ADDRESS[@]}" rm -f "${escaped_fname}"
 }
 
 function test_scp_service_local_to_remote {
@@ -305,11 +325,11 @@ function test_scp_service_local_to_remote {
 	local escaped_fname
 	printf -v escaped_fname '%q' "${fname}"
 
-	# clean up previous runs and create local file
+	# clean up any previous failed runs and create local file
 	"${SSH_WITH_SERVICE[@]}" rm -f "${escaped_fname}"
 	echo "${contents}" > "${fname}"
 
-	local cmd1=("${SCP_UUID}" --service "${TEST_SERVICE}" "${fname}" "${TEST_DEVICE_HOST}:${escaped_fname}")
+	local cmd1=("${SCP_UUID[@]}" --service "${TEST_SERVICE}" "${fname}" "${TEST_DEVICE_HOST}:${escaped_fname}")
 	local expected1=''
 	local cmd2=("${SSH_WITH_SERVICE[@]}" cat "${escaped_fname}")
 	local expected2="${contents}"
@@ -330,11 +350,11 @@ function test_scp_service_remote_to_local {
 	local escaped_fname
 	printf -v escaped_fname '%q' "${fname}"
 
-	# clean up previous runs and create remote file
+	# clean up any previous failed runs and create remote file
 	rm -f "${fname}"
 	"${SSH_WITH_SERVICE[@]}" echo "'${contents}'" '>' "${escaped_fname}"
 
-	local cmd1=("${SCP_UUID}" --service "${TEST_SERVICE}" "${TEST_DEVICE_HOST}:${escaped_fname}" "${fname}")
+	local cmd1=("${SCP_UUID[@]}" --service "${TEST_SERVICE}" "${TEST_DEVICE_HOST}:${escaped_fname}" "${fname}")
 	local expected1=''
 	local cmd2=(cat "${fname}")
 	local expected2="${contents}"
@@ -355,11 +375,11 @@ function test_rsync_local_to_remote {
 	local escaped_fname
 	printf -v escaped_fname '%q' "${fname}"
 
-	# clean up previous runs and create local file
+	# clean up any previous failed runs and create local file
 	"${SSH_WITH_SERVICE[@]}" rm -f "${escaped_fname}"
 	echo "${contents}" > "${fname}"
 
-	local cmd1=('rsync' '-e' "ssh-uuid --service ${TEST_SERVICE}" "${fname}" "${TEST_DEVICE_HOST}:${escaped_fname}")
+	local cmd1=('rsync' '-e' "ssh-uuid --service ${TEST_SERVICE}" "${fname}" "${TEST_DEVICE_HOST}:${fname}")
 	local expected1=''
 	local cmd2=("${SSH_WITH_SERVICE[@]}" cat "${escaped_fname}")
 	local expected2="${contents}"
@@ -384,7 +404,7 @@ function test_rsync_remote_to_local {
 	rm -f "${fname}"
 	"${SSH_WITH_SERVICE[@]}" echo "'${contents}'" '>' "${escaped_fname}"
 
-	local cmd1=('rsync' '-e' "ssh-uuid --service ${TEST_SERVICE}" "${TEST_DEVICE_HOST}:${escaped_fname}" "${fname}")
+	local cmd1=('rsync' '-e' "ssh-uuid --service ${TEST_SERVICE}" "${TEST_DEVICE_HOST}:${fname}" "${fname}")
 	local expected1=''
 	local cmd2=(cat "${fname}")
 	local expected2="${contents}"
